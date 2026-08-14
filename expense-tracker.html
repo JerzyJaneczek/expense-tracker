@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>Tally — Expense Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #EAEBE2;
+    --paper-card: #F5F4EC;
+    --ink: #22271F;
+    --ink-soft: #6B6F60;
+    --stamp-red: #A8412F;
+    --teal: #33635F;
+    --teal-dark: #244742;
+    --gold: #B9922E;
+    --line: rgba(34,39,31,0.12);
+    --cat1: #A8412F;
+    --cat2: #33635F;
+    --cat3: #B9922E;
+    --cat4: #5C7A99;
+    --cat5: #7A7F4E;
+    --cat6: #8C5A8C;
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+
+  html,body{
+    margin:0; padding:0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+  }
+
+  body{
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(34,39,31,0.05) 1px, transparent 0);
+    background-size: 14px 14px;
+  }
+
+  .app{
+    max-width:480px;
+    margin:0 auto;
+    padding:20px 18px 60px;
+    min-height:100vh;
+  }
+
+  /* Header */
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:18px;
+    padding-bottom:12px;
+    border-bottom:2px solid var(--ink);
+  }
+  .brand{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    font-size:22px;
+    letter-spacing:0.5px;
+  }
+  .brand span{ color:var(--stamp-red); }
+  .today-date{
+    font-size:12px;
+    color:var(--ink-soft);
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.6px;
+  }
+
+  /* Stat cards - receipt style */
+  .stats{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    margin-bottom:22px;
+  }
+  .receipt{
+    background: var(--paper-card);
+    border-top:3px solid var(--gold);
+    padding:14px 14px 18px;
+    position:relative;
+    box-shadow: 0 1px 0 rgba(34,39,31,0.06);
+  }
+  .receipt::after{
+    content:"";
+    position:absolute;
+    left:0; right:0; bottom:-6px;
+    height:12px;
+    background-image: radial-gradient(circle at 6px 0px, transparent 6px, var(--paper) 6.5px);
+    background-size: 12px 12px;
+    background-repeat: repeat-x;
+    background-position: -3px 0;
+  }
+  .receipt-label{
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:1.2px;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .receipt-amount{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    font-size:26px;
+    line-height:1.1;
+    font-variant-numeric: tabular-nums;
+    transition: transform 0.15s ease;
+  }
+  .receipt-amount.pulse{ transform: scale(1.06); }
+  .receipt-sub{
+    margin-top:4px;
+    font-size:11px;
+    color:var(--ink-soft);
+  }
+
+  /* Add form */
+  .add-card{
+    background: var(--paper-card);
+    border:1px solid var(--line);
+    padding:16px;
+    margin-bottom:26px;
+  }
+  .amount-row{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:10px;
+    margin-bottom:14px;
+  }
+  .currency-sign{
+    font-family:'Space Mono', monospace;
+    font-size:26px;
+    font-weight:700;
+    color: var(--ink-soft);
+  }
+  #amountInput{
+    flex:1;
+    border:none;
+    background:transparent;
+    outline:none;
+    font-family:'Space Mono', monospace;
+    font-size:30px;
+    font-weight:700;
+    color:var(--ink);
+    min-width:0;
+  }
+  #amountInput::placeholder{ color: rgba(34,39,31,0.25); }
+
+  .field-label{
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:1.2px;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .text-field{
+    width:100%;
+    border:1.5px solid var(--line);
+    background: var(--paper);
+    border-radius:6px;
+    padding:9px 10px;
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    color: var(--ink);
+    margin-bottom:14px;
+    outline:none;
+    resize:none;
+  }
+  .text-field:focus{ border-color: var(--teal); }
+  .text-field::placeholder{ color: rgba(34,39,31,0.35); }
+  textarea.text-field{ min-height:44px; }
+
+  .cat-label{
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:1.2px;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:8px;
+  }
+  .cat-grid{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:8px;
+    margin-bottom:16px;
+  }
+  .cat-chip{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    padding:9px 4px;
+    background: var(--paper);
+    border:1.5px solid var(--line);
+    border-radius:8px;
+    cursor:pointer;
+    font-family:'Inter', sans-serif;
+    font-size:10.5px;
+    font-weight:600;
+    color: var(--ink-soft);
+    transition: all 0.12s ease;
+  }
+  .cat-chip .emoji{ font-size:17px; }
+  .cat-chip.selected{
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper-card);
+    transform: rotate(-1.5deg);
+  }
+
+  .add-btn{
+    width:100%;
+    padding:14px;
+    background: var(--teal);
+    color: var(--paper-card);
+    border:none;
+    font-family:'Inter', sans-serif;
+    font-weight:700;
+    font-size:14.5px;
+    letter-spacing:0.3px;
+    text-transform:uppercase;
+    cursor:pointer;
+    transition: background 0.15s ease;
+  }
+  .add-btn:active{ background: var(--teal-dark); }
+  .add-btn:disabled{ background: var(--ink-soft); opacity:0.5; cursor:not-allowed; }
+
+  /* History */
+  .history-title{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:0.8px;
+    text-transform:uppercase;
+    margin-bottom:12px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .history-title::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background: var(--line);
+  }
+
+  .month-group{ margin-bottom:22px; }
+  .month-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    padding:6px 2px;
+    margin-bottom:4px;
+    border-bottom:1px solid var(--ink);
+  }
+  .month-name{
+    font-weight:800;
+    font-size:13.5px;
+  }
+  .month-total{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    font-size:13px;
+    color: var(--stamp-red);
+  }
+
+  .entry{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 2px;
+    border-bottom:1px solid var(--line);
+  }
+  .cat-dot{
+    width:9px; height:9px;
+    border-radius:50%;
+    flex-shrink:0;
+  }
+  .entry-main{ flex:1; min-width:0; }
+  .entry-cat{
+    font-size:13.5px;
+    font-weight:600;
+  }
+  .entry-title{
+    font-size:13.5px;
+    font-weight:600;
+  }
+  .entry-cat-sub{
+    font-size:10.5px;
+    color: var(--ink-soft);
+    margin-top:1px;
+  }
+  .entry-date{
+    font-size:11px;
+    color: var(--ink-soft);
+    margin-top:1px;
+  }
+  .entry-notes{
+    font-size:11.5px;
+    color: var(--ink-soft);
+    margin-top:3px;
+    font-style:italic;
+    line-height:1.35;
+  }
+  .entry-amount{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    font-size:14.5px;
+    white-space:nowrap;
+  }
+  .entry-del{
+    background:none;
+    border:none;
+    color: var(--ink-soft);
+    font-size:16px;
+    line-height:1;
+    padding:4px 2px 4px 8px;
+    cursor:pointer;
+    opacity:0.5;
+  }
+  .entry-del:active{ opacity:1; color: var(--stamp-red); }
+
+  .empty-state{
+    text-align:center;
+    padding:36px 12px;
+    color: var(--ink-soft);
+    font-size:13.5px;
+    border:1.5px dashed var(--line);
+  }
+  .empty-state .big{
+    font-size:26px;
+    margin-bottom:8px;
+  }
+
+  .loading{
+    text-align:center;
+    padding:40px 0;
+    color: var(--ink-soft);
+    font-size:13px;
+    font-family:'Space Mono', monospace;
+  }
+
+  .error-banner{
+    background: #F3E2DE;
+    border:1px solid var(--stamp-red);
+    color: var(--stamp-red);
+    font-size:12px;
+    padding:8px 10px;
+    margin-bottom:14px;
+    display:none;
+  }
+  .error-banner.show{ display:block; }
+
+  @media (min-width: 481px){
+    body{ padding: 20px 0; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="brand">TALLY<span>.</span></div>
+    <div class="today-date" id="todayDate"></div>
+  </header>
+
+  <div class="error-banner" id="errorBanner">Couldn't save — check your connection and try again.</div>
+
+  <div class="stats">
+    <div class="receipt">
+      <div class="receipt-label">This Week</div>
+      <div class="receipt-amount" id="weekTotal">$0.00</div>
+      <div class="receipt-sub" id="weekRange"></div>
+    </div>
+    <div class="receipt">
+      <div class="receipt-label">This Month</div>
+      <div class="receipt-amount" id="monthTotal">$0.00</div>
+      <div class="receipt-sub" id="monthRange"></div>
+    </div>
+  </div>
+
+  <div class="add-card">
+    <div class="amount-row">
+      <span class="currency-sign">$</span>
+      <input id="amountInput" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" />
+    </div>
+    <div class="field-label">Title</div>
+    <input id="titleInput" class="text-field" type="text" placeholder="e.g. Coffee with Sam" maxlength="60" />
+
+    <div class="cat-label">Category</div>
+    <div class="cat-grid" id="catGrid"></div>
+
+    <div class="field-label">Notes <span style="text-transform:none; font-weight:400; opacity:0.7;">(optional)</span></div>
+    <textarea id="notesInput" class="text-field" placeholder="Any details worth remembering…" maxlength="240"></textarea>
+
+    <button class="add-btn" id="addBtn">Add Expense</button>
+  </div>
+
+  <div class="history-title">History</div>
+  <div id="historyContainer">
+    <div class="loading">loading…</div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const CATEGORIES = [
+    { id:'food', name:'Food', emoji:'🍔', color:'var(--cat1)' },
+    { id:'transport', name:'Transport', emoji:'🚗', color:'var(--cat4)' },
+    { id:'shopping', name:'Shopping', emoji:'🛍️', color:'var(--cat6)' },
+    { id:'bills', name:'Bills', emoji:'💡', color:'var(--cat3)' },
+    { id:'fun', name:'Fun', emoji:'🎬', color:'var(--cat2)' },
+    { id:'health', name:'Health', emoji:'❤️', color:'var(--cat1)' },
+    { id:'home', name:'Home', emoji:'🏠', color:'var(--cat5)' },
+    { id:'other', name:'Other', emoji:'📦', color:'var(--ink-soft)' },
+  ];
+
+  let expenses = [];
+  let selectedCategory = null;
+  const STORAGE_KEY = 'expenses';
+
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function todayISO(){
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
+  }
+
+  function startOfWeek(d){
+    const dt = new Date(d);
+    const day = dt.getDay();
+    const diff = (day === 0 ? -6 : 1) - day;
+    dt.setDate(dt.getDate() + diff);
+    dt.setHours(0,0,0,0);
+    return dt;
+  }
+
+  function startOfMonth(d){
+    const dt = new Date(d.getFullYear(), d.getMonth(), 1);
+    dt.setHours(0,0,0,0);
+    return dt;
+  }
+
+  function renderTodayDate(){
+    const now = new Date();
+    $('todayDate').textContent = now.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+  }
+
+  function renderCategoryGrid(){
+    const grid = $('catGrid');
+    grid.innerHTML = '';
+    CATEGORIES.forEach(cat => {
+      const chip = document.createElement('div');
+      chip.className = 'cat-chip' + (selectedCategory === cat.id ? ' selected' : '');
+      chip.innerHTML = `<span class="emoji">${cat.emoji}</span><span>${cat.name}</span>`;
+      chip.addEventListener('click', () => {
+        selectedCategory = cat.id;
+        renderCategoryGrid();
+      });
+      grid.appendChild(chip);
+    });
+  }
+
+  function showError(show){
+    $('errorBanner').classList.toggle('show', !!show);
+  }
+
+  async function loadExpenses(){
+    try{
+      const res = await window.storage.get(STORAGE_KEY, false);
+      expenses = res && res.value ? JSON.parse(res.value) : [];
+    }catch(e){
+      expenses = [];
+    }
+    renderAll();
+  }
+
+  async function saveExpenses(){
+    try{
+      const result = await window.storage.set(STORAGE_KEY, JSON.stringify(expenses), false);
+      if(!result) throw new Error('no result');
+      showError(false);
+    }catch(e){
+      showError(true);
+    }
+  }
+
+  function pulseStat(el){
+    el.classList.add('pulse');
+    setTimeout(() => el.classList.remove('pulse'), 150);
+  }
+
+  function renderStats(){
+    const now = new Date();
+    const wkStart = startOfWeek(now);
+    const moStart = startOfMonth(now);
+
+    const weekSum = expenses
+      .filter(e => new Date(e.date + 'T00:00:00') >= wkStart)
+      .reduce((s,e) => s + e.amount, 0);
+    const monthSum = expenses
+      .filter(e => new Date(e.date + 'T00:00:00') >= moStart)
+      .reduce((s,e) => s + e.amount, 0);
+
+    $('weekTotal').textContent = fmt(weekSum);
+    $('monthTotal').textContent = fmt(monthSum);
+
+    const wkEnd = new Date(wkStart); wkEnd.setDate(wkEnd.getDate() + 6);
+    $('weekRange').textContent = wkStart.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' – ' + wkEnd.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    $('monthRange').textContent = now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  }
+
+  function renderHistory(){
+    const container = $('historyContainer');
+    if(expenses.length === 0){
+      container.innerHTML = `<div class="empty-state"><div class="big">🧾</div>No entries yet — add your first expense above.</div>`;
+      return;
+    }
+
+    const groups = {};
+    expenses.forEach(e => {
+      const key = e.date.slice(0,7);
+      if(!groups[key]) groups[key] = [];
+      groups[key].push(e);
+    });
+
+    const sortedKeys = Object.keys(groups).sort().reverse();
+    container.innerHTML = '';
+
+    sortedKeys.forEach(key => {
+      const items = groups[key].slice().sort((a,b) => (b.date + b.createdAt) > (a.date + a.createdAt) ? 1 : -1);
+      const subtotal = items.reduce((s,e) => s + e.amount, 0);
+      const [y,m] = key.split('-');
+      const monthLabel = new Date(Number(y), Number(m)-1, 1).toLocaleDateString('en-US',{month:'long', year:'numeric'});
+
+      const group = document.createElement('div');
+      group.className = 'month-group';
+      group.innerHTML = `
+        <div class="month-header">
+          <div class="month-name">${monthLabel}</div>
+          <div class="month-total">${fmt(subtotal)}</div>
+        </div>
+      `;
+
+      items.forEach(e => {
+        const cat = CATEGORIES.find(c => c.id === e.category) || CATEGORIES[CATEGORIES.length-1];
+        const row = document.createElement('div');
+        row.className = 'entry';
+        const dateLabel = new Date(e.date + 'T00:00:00').toLocaleDateString('en-US',{month:'short', day:'numeric'});
+        const heading = e.title ? escapeHtml(e.title) : `${cat.emoji} ${cat.name}`;
+        const subLine = e.title
+          ? `${cat.emoji} ${cat.name} · ${dateLabel}`
+          : dateLabel;
+        const notesLine = e.notes ? `<div class="entry-notes">${escapeHtml(e.notes)}</div>` : '';
+        row.innerHTML = `
+          <div class="cat-dot" style="background:${cat.color}"></div>
+          <div class="entry-main">
+            <div class="entry-title">${heading}</div>
+            <div class="entry-cat-sub">${subLine}</div>
+            ${notesLine}
+          </div>
+          <div class="entry-amount">${fmt(e.amount)}</div>
+          <button class="entry-del" data-id="${e.id}">✕</button>
+        `;
+        group.appendChild(row);
+      });
+
+      container.appendChild(group);
+    });
+
+    container.querySelectorAll('.entry-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        expenses = expenses.filter(e => e.id !== id);
+        renderAll();
+        await saveExpenses();
+      });
+    });
+  }
+
+  function renderAll(){
+    renderStats();
+    renderHistory();
+  }
+
+  async function addExpense(){
+    const input = $('amountInput');
+    const val = parseFloat(input.value);
+    if(!val || val <= 0){
+      input.focus();
+      return;
+    }
+    if(!selectedCategory){
+      selectedCategory = 'other';
+      renderCategoryGrid();
+    }
+
+    const titleInput = $('titleInput');
+    const notesInput = $('notesInput');
+
+    const entry = {
+      id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
+      amount: Math.round(val * 100) / 100,
+      category: selectedCategory,
+      title: titleInput.value.trim(),
+      notes: notesInput.value.trim(),
+      date: todayISO(),
+      createdAt: Date.now()
+    };
+
+    expenses.push(entry);
+    input.value = '';
+    titleInput.value = '';
+    notesInput.value = '';
+    selectedCategory = null;
+    renderCategoryGrid();
+    renderAll();
+    pulseStat($('weekTotal'));
+    pulseStat($('monthTotal'));
+    await saveExpenses();
+  }
+
+  $('addBtn').addEventListener('click', addExpense);
+  $('amountInput').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') addExpense();
+  });
+
+  renderTodayDate();
+  renderCategoryGrid();
+  loadExpenses();
+})();
+</script>
+</body>
+</html>

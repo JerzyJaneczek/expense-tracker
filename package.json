@@ -1,0 +1,11 @@
+{
+  "name": "expense-tracker",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "setup": "npm install && npm install --prefix server && npm install --prefix ExpenseTracker/client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
