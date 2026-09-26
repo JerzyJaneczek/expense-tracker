@@ -9,35 +9,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-export function LoginForm({ linkFailed }: { linkFailed: boolean }) {
+export function LoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState("")
-  const [code, setCode] = useState("")
-  const [sent, setSent] = useState(false)
+  const [password, setPassword] = useState("")
   const [busy, setBusy] = useState(false)
 
-  async function sendLink(e: React.FormEvent) {
+  async function signIn(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
-    const { error } = await createClient().auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    })
-    setBusy(false)
-    if (error) return toast.error(error.message)
-    setSent(true)
-  }
-
-  async function verifyCode(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    const { error } = await createClient().auth.verifyOtp({
-      email,
-      token: code.trim(),
-      type: "email",
-    })
-    setBusy(false)
-    if (error) return toast.error(error.message)
+    const { error } = await createClient().auth.signInWithPassword({ email, password })
+    if (error) {
+      setBusy(false)
+      return toast.error(error.message)
+    }
     router.replace("/")
     router.refresh()
   }
@@ -46,21 +31,11 @@ export function LoginForm({ linkFailed }: { linkFailed: boolean }) {
     <Card className="w-full max-w-sm">
       <CardHeader>
         <CardTitle className="text-2xl font-bold tracking-tight">Tally</CardTitle>
-        <CardDescription>
-          {sent
-            ? `We emailed ${email}. Tap the link, or type the code from the email below.`
-            : "Sign in with your email. No password needed."}
-        </CardDescription>
+        <CardDescription>Sign in to your account.</CardDescription>
       </CardHeader>
       <CardContent>
-        {linkFailed && !sent && (
-          <p className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-            That sign-in link didn&apos;t work (it may have expired or been opened in a different
-            browser). Request a new one, or use the code instead.
-          </p>
-        )}
-        {!sent ? (
-          <form onSubmit={sendLink} className="grid gap-3">
+        <form onSubmit={signIn} className="grid gap-3">
+          <div className="grid gap-1.5">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
@@ -71,30 +46,23 @@ export function LoginForm({ linkFailed }: { linkFailed: boolean }) {
               onChange={(e) => setEmail(e.target.value)}
               className="h-11"
             />
-            <Button type="submit" size="lg" className="h-11" disabled={busy}>
-              {busy ? "Sending…" : "Email me a sign-in link"}
-            </Button>
-          </form>
-        ) : (
-          <form onSubmit={verifyCode} className="grid gap-3">
-            <Label htmlFor="code">Code from email</Label>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="password">Password</Label>
             <Input
-              id="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
+              id="password"
+              type="password"
+              autoComplete="current-password"
               required
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="h-11 text-center font-mono text-lg tracking-widest"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-11"
             />
-            <Button type="submit" size="lg" className="h-11" disabled={busy}>
-              {busy ? "Checking…" : "Sign in"}
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => setSent(false)}>
-              Use a different email
-            </Button>
-          </form>
-        )}
+          </div>
+          <Button type="submit" size="lg" className="mt-1 h-11" disabled={busy}>
+            {busy ? "Signing in…" : "Sign in"}
+          </Button>
+        </form>
       </CardContent>
     </Card>
   )
