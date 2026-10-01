@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -27,12 +29,20 @@ import { NativeSelect } from "@/components/native-select"
 import { TagChip } from "@/components/tag-chip"
 import { useTags } from "@/components/tags-provider"
 import { fetchEntries } from "@/lib/data"
-import { addMonths, currentMonth, formatDay, formatHKD, formatMonth, monthRange } from "@/lib/format"
+import {
+  addMonths,
+  currentMonth,
+  daysInMonth,
+  formatDay,
+  formatHKD,
+  formatMonth,
+  monthRange,
+} from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Entry, EntryType, Tag } from "@/lib/types"
 
 const RANGES = [
-  { value: "1", label: "This month" },
+  { value: "month", label: "Single month" },
   { value: "3", label: "Last 3 months" },
   { value: "6", label: "Last 6 months" },
   { value: "12", label: "Last 12 months" },
@@ -50,7 +60,8 @@ const compactHKD = new Intl.NumberFormat("en-HK", {
 export default function ComparePage() {
   const { tags, categories, people, byId } = useTags()
 
-  const [range, setRange] = useState("3")
+  const [range, setRange] = useState("month")
+  const [singleMonth, setSingleMonth] = useState(currentMonth)
   const [customFrom, setCustomFrom] = useState(addMonths(currentMonth(), -5))
   const [customTo, setCustomTo] = useState(currentMonth())
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("expense")
@@ -59,11 +70,14 @@ export default function ComparePage() {
   const [loaded, setLoaded] = useState<{ key: string; entries: Entry[] } | null>(null)
 
   const [from, to] =
-    range === "custom"
-      ? customFrom <= customTo
-        ? [customFrom, customTo]
-        : [customTo, customFrom]
-      : [addMonths(currentMonth(), 1 - Number(range)), currentMonth()]
+    range === "month"
+      ? [singleMonth, singleMonth]
+      : range === "custom"
+        ? customFrom <= customTo
+          ? [customFrom, customTo]
+          : [customTo, customFrom]
+        : [addMonths(currentMonth(), 1 - Number(range)), currentMonth()]
+  const isSingleMonth = from === to
   const rangeKey = `${from}|${to}`
   const loading = loaded?.key !== rangeKey
   const entries = useMemo(() => (loaded && !loading ? loaded.entries : []), [loading, loaded])
@@ -110,18 +124,40 @@ export default function ComparePage() {
   }))
 
   const months = monthRange(from, to)
-  const chartData = months.map((m) => {
-    const inMonth = typed.filter((e) => e.date.startsWith(m))
-    const row: Record<string, string | number> = { month: formatMonth(m, "short") }
+  // One bar group per day for a single month, otherwise one per month
+  const buckets = isSingleMonth
+    ? Array.from({ length: daysInMonth(from) }, (_, i) => {
+        const date = `${from}-${String(i + 1).padStart(2, "0")}`
+        return { prefix: date, label: String(i + 1), title: formatDay(date) }
+      })
+    : months.map((m) => ({ prefix: m, label: formatMonth(m, "short"), title: formatMonth(m) }))
+
+  const chartData = buckets.map(({ prefix, label, title }) => {
+    const inBucket = typed.filter((e) => e.date.startsWith(prefix))
+    const row: Record<string, string | number> = { label, title }
     if (selectedTags.length) {
       for (const t of selectedTags) {
-        row[t.id] = inMonth.filter((e) => e.tagIds.includes(t.id)).reduce((s, e) => s + signed(e), 0)
+        row[t.id] = inBucket.filter((e) => e.tagIds.includes(t.id)).reduce((s, e) => s + signed(e), 0)
       }
     } else {
-      row.all = inMonth.reduce((s, e) => s + signed(e), 0)
+      row.all = inBucket.reduce((s, e) => s + signed(e), 0)
     }
     return row
   })
+
+  // Totals per category over the matching entries; these add up to the overall total
+  const byCategory = (() => {
+    const rows = new Map<string, { tag: Tag | null; total: number; count: number }>()
+    for (const e of matching) {
+      const tag = e.tagIds.map((id) => byId.get(id)).find((t) => t?.kind === "category") ?? null
+      const key = tag?.id ?? "none"
+      const row = rows.get(key) ?? { tag, total: 0, count: 0 }
+      row.total += signed(e)
+      row.count += 1
+      rows.set(key, row)
+    }
+    return [...rows.values()].sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
+  })()
 
   const chartConfig: ChartConfig = selectedTags.length
     ? Object.fromEntries(selectedTags.map((t) => [t.id, { label: t.name, color: t.color }]))
@@ -156,6 +192,34 @@ export default function ComparePage() {
                 <option value="both">Both (net)</option>
               </NativeSelect>
             </div>
+            {range === "month" && (
+              <div className="col-span-2 grid gap-1.5 sm:col-span-1">
+                <Label>Month</Label>
+                <div className="flex h-10 items-center rounded-lg border border-input">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Previous month"
+                    onClick={() => setSingleMonth(addMonths(singleMonth, -1))}
+                  >
+                    <ChevronLeft />
+                  </Button>
+                  <span className="flex-1 px-2 text-center text-sm font-medium tabular-nums">
+                    {formatMonth(singleMonth)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Next month"
+                    onClick={() => setSingleMonth(addMonths(singleMonth, 1))}
+                  >
+                    <ChevronRight />
+                  </Button>
+                </div>
+              </div>
+            )}
             {range === "custom" && (
               <>
                 <div className="grid gap-1.5">
@@ -237,7 +301,8 @@ export default function ComparePage() {
               </span>
               <span className="text-lg font-semibold tabular-nums sm:text-xl">{formatHKD(total)}</span>
               <span className="text-xs text-muted-foreground">
-                {count} {count === 1 ? "entry" : "entries"} · avg {formatHKD(total / months.length)}/mo
+                {count} {count === 1 ? "entry" : "entries"}
+                {!isSingleMonth && ` · avg ${formatHKD(total / months.length)}/mo`}
               </span>
             </CardContent>
           </Card>
@@ -246,7 +311,7 @@ export default function ComparePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>By month</CardTitle>
+          <CardTitle>{isSingleMonth ? `By day · ${formatMonth(from)}` : "By month"}</CardTitle>
           <CardDescription>
             {selectedTags.length
               ? `${typeLabel(typeFilter)} for each selected tag`
@@ -260,7 +325,14 @@ export default function ComparePage() {
             <ChartContainer config={chartConfig} className="aspect-auto h-72 w-full">
               <BarChart data={chartData} barGap={2} margin={{ left: 0, right: 8 }}>
                 <CartesianGrid vertical={false} />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  interval={isSingleMonth ? "preserveStartEnd" : 0}
+                  minTickGap={4}
+                />
                 <YAxis
                   tickLine={false}
                   axisLine={false}
@@ -270,6 +342,7 @@ export default function ComparePage() {
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
+                      labelFormatter={(_, payload) => payload?.[0]?.payload?.title}
                       formatter={(value, name) => (
                         <div className="flex w-full items-center justify-between gap-4">
                           <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -296,11 +369,80 @@ export default function ComparePage() {
                     dataKey={key}
                     fill={`var(--color-${key})`}
                     radius={[4, 4, 0, 0]}
-                    maxBarSize={40}
+                    maxBarSize={isSingleMonth ? 24 : 40}
                   />
                 ))}
               </BarChart>
             </ChartContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>By category</CardTitle>
+          <CardDescription>
+            {typeLabel(typeFilter)}
+            {selectedTags.length > 0 && " matching the selected tags"} ·{" "}
+            {isSingleMonth
+              ? formatMonth(from)
+              : `${formatMonth(from, "short")} – ${formatMonth(to, "short")}`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {byCategory.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              {loading ? "Loading…" : "Nothing to show."}
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Entries</TableHead>
+                  {typeFilter !== "both" && <TableHead className="text-right">Share</TableHead>}
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {byCategory.map(({ tag, total, count }) => (
+                  <TableRow key={tag?.id ?? "none"}>
+                    <TableCell>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="size-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: tag?.color ?? "#94a3b8" }}
+                        />
+                        {tag?.name ?? "Uncategorised"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {count}
+                    </TableCell>
+                    {typeFilter !== "both" && (
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {matchingTotal ? Math.round((total / matchingTotal) * 100) : 0}%
+                      </TableCell>
+                    )}
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {formatHKD(total)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell className="font-semibold">Total</TableCell>
+                  <TableCell className="text-right tabular-nums">{matching.length}</TableCell>
+                  {typeFilter !== "both" && (
+                    <TableCell className="text-right tabular-nums">100%</TableCell>
+                  )}
+                  <TableCell className="text-right font-semibold tabular-nums">
+                    {formatHKD(matchingTotal)}
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
           )}
         </CardContent>
       </Card>
