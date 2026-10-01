@@ -2,13 +2,14 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { CalendarDays, ChartColumn, LogOut, Tags } from "lucide-react"
+import { CalendarDays, ChartColumn, ListChecks, LogOut, Tags } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-const LINKS = [
+const LINKS: { href: string; label: string; short?: string; icon: typeof Tags }[] = [
   { href: "/", label: "Month", icon: CalendarDays },
   { href: "/compare", label: "Compare", icon: ChartColumn },
-  { href: "/tags", label: "Tags & People", icon: Tags },
+  { href: "/presets", label: "Presets", icon: ListChecks },
+  { href: "/tags", label: "Tags & People", short: "Tags", icon: Tags },
 ]
 
 export function TopNav() {
@@ -50,8 +51,8 @@ export function TopNav() {
 export function BottomNav() {
   const pathname = usePathname()
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t bg-background pb-[env(safe-area-inset-bottom)] sm:hidden">
-      {LINKS.map(({ href, label, icon: Icon }) => (
+    <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-background pb-[env(safe-area-inset-bottom)] sm:hidden">
+      {LINKS.map(({ href, label, short, icon: Icon }) => (
         <Link
           key={href}
           href={href}
@@ -61,7 +62,7 @@ export function BottomNav() {
           )}
         >
           <Icon className="size-5" />
-          {label}
+          {short ?? label}
         </Link>
       ))}
     </nav>
