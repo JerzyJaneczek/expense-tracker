@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   ChartContainer,
   ChartLegend,
@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { MonthCalendar } from "@/components/month-calendar"
 import { NativeSelect } from "@/components/native-select"
 import { TagChip } from "@/components/tag-chip"
 import { useTags } from "@/components/tags-provider"
@@ -32,7 +33,6 @@ import { fetchEntries } from "@/lib/data"
 import {
   addMonths,
   currentMonth,
-  daysInMonth,
   formatDay,
   formatHKD,
   formatMonth,
@@ -62,6 +62,8 @@ export default function ComparePage() {
 
   const [range, setRange] = useState("month")
   const [singleMonth, setSingleMonth] = useState(currentMonth)
+  // Day of the single month picked on the calendar, which filters the entries table
+  const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [customFrom, setCustomFrom] = useState(addMonths(currentMonth(), -5))
   const [customTo, setCustomTo] = useState(currentMonth())
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("expense")
@@ -124,17 +126,12 @@ export default function ComparePage() {
   }))
 
   const months = monthRange(from, to)
-  // One bar group per day for a single month, otherwise one per month
-  const buckets = isSingleMonth
-    ? Array.from({ length: daysInMonth(from) }, (_, i) => {
-        const date = `${from}-${String(i + 1).padStart(2, "0")}`
-        return { prefix: date, label: String(i + 1), title: formatDay(date) }
-      })
-    : months.map((m) => ({ prefix: m, label: formatMonth(m, "short"), title: formatMonth(m) }))
-
-  const chartData = buckets.map(({ prefix, label, title }) => {
-    const inBucket = typed.filter((e) => e.date.startsWith(prefix))
-    const row: Record<string, string | number> = { label, title }
+  const chartData = months.map((m) => {
+    const inBucket = typed.filter((e) => e.date.startsWith(m))
+    const row: Record<string, string | number> = {
+      label: formatMonth(m, "short"),
+      title: formatMonth(m),
+    }
     if (selectedTags.length) {
       for (const t of selectedTags) {
         row[t.id] = inBucket.filter((e) => e.tagIds.includes(t.id)).reduce((s, e) => s + signed(e), 0)
@@ -144,6 +141,19 @@ export default function ComparePage() {
     }
     return row
   })
+
+  // Totals per day of the single month, for the calendar
+  const dayTotals = new Map<number, number>()
+  if (isSingleMonth) {
+    for (const e of matching) {
+      const day = Number(e.date.slice(8))
+      dayTotals.set(day, (dayTotals.get(day) ?? 0) + signed(e))
+    }
+  }
+  const tableEntries =
+    isSingleMonth && selectedDay !== null
+      ? matching.filter((e) => Number(e.date.slice(8)) === selectedDay)
+      : matching
 
   // Totals per category over the matching entries; these add up to the overall total
   const byCategory = (() => {
@@ -172,7 +182,10 @@ export default function ComparePage() {
           <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end">
             <div className="grid gap-1.5">
               <Label htmlFor="range">Period</Label>
-              <NativeSelect id="range" value={range} onChange={(e) => setRange(e.target.value)}>
+              <NativeSelect id="range" value={range} onChange={(e) => {
+                  setRange(e.target.value)
+                  setSelectedDay(null)
+                }}>
                 {RANGES.map((r) => (
                   <option key={r.value} value={r.value}>
                     {r.label}
@@ -201,7 +214,10 @@ export default function ComparePage() {
                     variant="ghost"
                     size="icon"
                     aria-label="Previous month"
-                    onClick={() => setSingleMonth(addMonths(singleMonth, -1))}
+                    onClick={() => {
+                      setSingleMonth(addMonths(singleMonth, -1))
+                      setSelectedDay(null)
+                    }}
                   >
                     <ChevronLeft />
                   </Button>
@@ -213,7 +229,10 @@ export default function ComparePage() {
                     variant="ghost"
                     size="icon"
                     aria-label="Next month"
-                    onClick={() => setSingleMonth(addMonths(singleMonth, 1))}
+                    onClick={() => {
+                      setSingleMonth(addMonths(singleMonth, 1))
+                      setSelectedDay(null)
+                    }}
                   >
                     <ChevronRight />
                   </Button>
@@ -309,74 +328,98 @@ export default function ComparePage() {
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{isSingleMonth ? `By day · ${formatMonth(from)}` : "By month"}</CardTitle>
-          <CardDescription>
-            {selectedTags.length
-              ? `${typeLabel(typeFilter)} for each selected tag`
-              : `All ${typeLabel(typeFilter).toLowerCase()}. Select tags above to compare them.`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
-          ) : (
-            <ChartContainer config={chartConfig} className="aspect-auto h-72 w-full">
-              <BarChart data={chartData} barGap={2} margin={{ left: 0, right: 8 }}>
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  interval={isSingleMonth ? "preserveStartEnd" : 0}
-                  minTickGap={4}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  width={48}
-                  tickFormatter={(v: number) => compactHKD.format(v)}
-                />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      labelFormatter={(_, payload) => payload?.[0]?.payload?.title}
-                      formatter={(value, name) => (
-                        <div className="flex w-full items-center justify-between gap-4">
-                          <span className="flex items-center gap-1.5 text-muted-foreground">
-                            <span
-                              className="size-2.5 rounded-[2px]"
-                              style={{ backgroundColor: chartConfig[name as string]?.color }}
-                            />
-                            {chartConfig[name as string]?.label}
-                          </span>
-                          <span className="font-mono font-medium tabular-nums text-foreground">
-                            {formatHKD(Number(value))}
-                          </span>
-                        </div>
-                      )}
-                    />
-                  }
-                />
-                {Object.keys(chartConfig).length > 1 && (
-                  <ChartLegend content={<ChartLegendContent />} />
-                )}
-                {Object.keys(chartConfig).map((key) => (
-                  <Bar
-                    key={key}
-                    dataKey={key}
-                    fill={`var(--color-${key})`}
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={isSingleMonth ? 24 : 40}
+      {isSingleMonth ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{formatMonth(from)}</CardTitle>
+            <CardDescription>
+              {typeLabel(typeFilter)} per day
+              {selectedTags.length > 0 && " for the selected tags"} (HKD). Tap a day to see its
+              entries.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
+            ) : (
+              <MonthCalendar
+                month={from}
+                totals={dayTotals}
+                selectedDay={selectedDay}
+                onSelectDay={setSelectedDay}
+              />
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>By month</CardTitle>
+            <CardDescription>
+              {selectedTags.length
+                ? `${typeLabel(typeFilter)} for each selected tag`
+                : `All ${typeLabel(typeFilter).toLowerCase()}. Select tags above to compare them.`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
+            ) : (
+              <ChartContainer config={chartConfig} className="aspect-auto h-72 w-full">
+                <BarChart data={chartData} barGap={2} margin={{ left: 0, right: 8 }}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    interval={0}
                   />
-                ))}
-              </BarChart>
-            </ChartContainer>
-          )}
-        </CardContent>
-      </Card>
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    width={48}
+                    tickFormatter={(v: number) => compactHKD.format(v)}
+                  />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        labelFormatter={(_, payload) => payload?.[0]?.payload?.title}
+                        formatter={(value, name) => (
+                          <div className="flex w-full items-center justify-between gap-4">
+                            <span className="flex items-center gap-1.5 text-muted-foreground">
+                              <span
+                                className="size-2.5 rounded-[2px]"
+                                style={{ backgroundColor: chartConfig[name as string]?.color }}
+                              />
+                              {chartConfig[name as string]?.label}
+                            </span>
+                            <span className="font-mono font-medium tabular-nums text-foreground">
+                              {formatHKD(Number(value))}
+                            </span>
+                          </div>
+                        )}
+                      />
+                    }
+                  />
+                  {Object.keys(chartConfig).length > 1 && (
+                    <ChartLegend content={<ChartLegendContent />} />
+                  )}
+                  {Object.keys(chartConfig).map((key) => (
+                    <Bar
+                      key={key}
+                      dataKey={key}
+                      fill={`var(--color-${key})`}
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={40}
+                    />
+                  ))}
+                </BarChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -449,10 +492,21 @@ export default function ComparePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Matching entries</CardTitle>
+          <CardTitle>
+            {selectedDay !== null && isSingleMonth
+              ? `Entries on ${formatDay(`${from}-${String(selectedDay).padStart(2, "0")}`)}`
+              : "Matching entries"}
+          </CardTitle>
+          {selectedDay !== null && isSingleMonth && (
+            <CardAction>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedDay(null)}>
+                Show whole month
+              </Button>
+            </CardAction>
+          )}
         </CardHeader>
         <CardContent>
-          {matching.length === 0 ? (
+          {tableEntries.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               {loading ? "Loading…" : "Nothing matches."}
             </p>
@@ -467,7 +521,7 @@ export default function ComparePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {matching.map((e) => (
+                {tableEntries.map((e) => (
                   <TableRow key={e.id}>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {formatDay(e.date)} {e.date.slice(2, 4)}
