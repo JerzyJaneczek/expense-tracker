@@ -1,11 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight, Copy, Plus } from "lucide-react"
+import { ChevronLeft, ChevronRight, Copy, ListPlus, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ConfirmDialog, type ConfirmRequest } from "@/components/confirm-dialog"
+import { ApplyPresetDialog } from "@/components/apply-preset-dialog"
 import { EntryFormDialog } from "@/components/entry-form-dialog"
 import { EntryList } from "@/components/entry-list"
 import { CategoryBreakdown } from "@/components/category-breakdown"
@@ -21,6 +22,7 @@ export default function MonthPage() {
   // Entries tagged with the month they belong to, so switching months shows "Loading…"
   const [loaded, setLoaded] = useState<{ month: string; entries: Entry[] } | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+  const [presetOpen, setPresetOpen] = useState(false)
   const [editing, setEditing] = useState<Entry | null>(null)
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null)
 
@@ -136,6 +138,10 @@ export default function MonthPage() {
           </Button>
         )}
         <div className="ml-auto flex gap-2">
+          <Button variant="outline" onClick={() => setPresetOpen(true)} disabled={loading}>
+            <ListPlus /> <span className="hidden sm:inline">Add preset</span>
+            <span className="sm:hidden">Preset</span>
+          </Button>
           <Button variant="outline" onClick={askCopy} disabled={loading}>
             <Copy /> <span className="hidden sm:inline">Copy last month</span>
             <span className="sm:hidden">Copy prev.</span>
@@ -175,6 +181,9 @@ export default function MonthPage() {
                     <Button onClick={openAdd}>
                       <Plus /> Add your salary
                     </Button>
+                    <Button variant="outline" onClick={() => setPresetOpen(true)}>
+                      <ListPlus /> Add a preset
+                    </Button>
                     <Button variant="outline" onClick={askCopy}>
                       <Copy /> Copy last month
                     </Button>
@@ -211,6 +220,13 @@ export default function MonthPage() {
         entry={editing}
         defaultDate={defaultDate}
         onSaved={load}
+      />
+      <ApplyPresetDialog
+        open={presetOpen}
+        onOpenChange={setPresetOpen}
+        month={month}
+        monthEntries={entries}
+        onApplied={load}
       />
       <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
     </div>
